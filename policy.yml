@@ -1,0 +1,20 @@
+policies:
+  - name: find-unencrypted-s3
+    description: Find S3 buckets without default encryption
+    resource: aws.s3
+    filters:
+      - type: bucket-encryption
+        state: false
+
+  - name: ec2-missing-tags
+    description: Find EC2 instances missing required tags
+    resource: aws.ec2
+    filters:
+      - "tag:Environment": absent
+      - "tag:Owner": absent
+
+  - name: find-public-s3
+    description: Find S3 buckets with public access
+    resource: aws.s3
+    filters:
+      - type: global-grants

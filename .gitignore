@@ -1,0 +1,18 @@
+# Virtual environment
+custodian/
+
+# Cloud Custodian output (regenerated on each run)
+output/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
