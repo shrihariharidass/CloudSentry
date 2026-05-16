@@ -43,11 +43,17 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/cloudcustodian-UI
+
+            # Set git credentials for pull
+            git remote set-url origin https://${{ secrets.GH_USERNAME }}:${{ secrets.GH_TOKEN }}@github.com/${{ secrets.GH_USERNAME }}/cloudcustodian-UI.git
+
             git pull origin main
 
+            # Install/update dependencies
             source custodian/bin/activate
             pip install -r frontend/requirements.txt
 
+            # Restart dashboard service
             sudo systemctl restart custodian-dashboard
 
             echo "Dashboard deployed successfully"
