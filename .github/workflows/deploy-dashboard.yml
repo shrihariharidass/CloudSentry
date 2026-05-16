@@ -8,10 +8,8 @@ on:
   workflow_dispatch:
 
 env:
-  EC2_HOST: ${{ secrets.EC2_HOST }}
-  EC2_USER: ubuntu
-  S3_BUCKET: custodian-results-858688858026
   AWS_REGION: us-east-1
+  S3_BUCKET: custodian-results-858688858026
 
 jobs:
   deploy-dashboard:
@@ -20,29 +18,39 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Get EC2 public IP
+        id: ec2
+        run: |
+          EC2_IP=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=cloudcustodian-ui-dashboard" \
+                      "Name=instance-state-name,Values=running" \
+            --query "Reservations[0].Instances[0].PublicIpAddress" \
+            --output text)
+          echo "ip=$EC2_IP" >> $GITHUB_OUTPUT
+          echo "Dashboard EC2 IP: $EC2_IP"
+
       - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ env.EC2_USER }}
+          host: ${{ steps.ec2.outputs.ip }}
+          username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/cloudcustodian-UI
             git pull origin main
 
             # Install/update dependencies
-            source ~/custodian/bin/activate
+            source custodian/bin/activate
             pip install -r frontend/requirements.txt
 
-            # Stop existing dashboard process
-            fuser -k 5000/tcp || true
+            # Restart dashboard service
+            sudo systemctl restart custodian-dashboard
 
-            # Start dashboard with S3 backend
-            cd frontend
-            export C7N_S3_BUCKET="${{ env.S3_BUCKET }}"
-            export C7N_S3_PREFIX="policies/"
-            export AWS_REGION="${{ env.AWS_REGION }}"
-            export C7N_LOCAL_OUTPUT="../output"
-            nohup gunicorn --bind 0.0.0.0:5000 --workers 2 app:app > /tmp/dashboard.log 2>&1 &
-
-            echo "Dashboard deployed successfully"
+            echo "Dashboard deployed successfully at http://${{ steps.ec2.outputs.ip }}:5000"

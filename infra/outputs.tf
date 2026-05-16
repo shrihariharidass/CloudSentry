@@ -22,3 +22,18 @@ output "cloudtrail_name" {
   description = "CloudTrail trail name"
   value       = aws_cloudtrail.custodian.name
 }
+
+output "dashboard_public_ip" {
+  description = "Dashboard EC2 public IP"
+  value       = aws_instance.dashboard.public_ip
+}
+
+output "dashboard_url" {
+  description = "Dashboard URL"
+  value       = "http://${aws_instance.dashboard.public_ip}:5000"
+}
+
+output "dashboard_instance_id" {
+  description = "Dashboard EC2 instance ID"
+  value       = aws_instance.dashboard.id
+}
