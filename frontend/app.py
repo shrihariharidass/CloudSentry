@@ -1,7 +1,9 @@
 """
 Cloud Custodian Dashboard - Flask app that reads policy results from S3.
+Handles c7n's date-based S3 output structure with gzipped files.
 """
 
+import gzip
 import json
 import os
 from datetime import datetime
@@ -19,8 +21,34 @@ LOCAL_OUTPUT = os.environ.get("C7N_LOCAL_OUTPUT", "")  # Fallback to local outpu
 s3_client = boto3.client("s3", region_name=AWS_REGION)
 
 
+def find_latest_resources_key(policy_prefix):
+    """Find the most recent resources.json.gz for a policy in date-based S3 structure.
+    Structure: policies/<policy-name>/YYYY/MM/DD/HH/resources.json.gz
+    """
+    try:
+        response = s3_client.list_objects_v2(
+            Bucket=S3_BUCKET, Prefix=policy_prefix
+        )
+        objects = response.get("Contents", [])
+
+        # Find all resources.json.gz files and get the latest one
+        resource_files = [
+            obj for obj in objects if obj["Key"].endswith("resources.json.gz")
+        ]
+
+        if not resource_files:
+            return None, None
+
+        # Sort by LastModified to get the most recent
+        resource_files.sort(key=lambda x: x["LastModified"], reverse=True)
+        latest = resource_files[0]
+        return latest["Key"], latest["LastModified"]
+    except Exception:
+        return None, None
+
+
 def load_results_from_s3():
-    """Load policy results from S3 bucket."""
+    """Load policy results from S3 bucket with date-based paths and gzip."""
     results = []
     try:
         response = s3_client.list_objects_v2(
@@ -30,25 +58,32 @@ def load_results_from_s3():
         prefixes = response.get("CommonPrefixes", [])
         for prefix in prefixes:
             policy_name = prefix["Prefix"].replace(S3_PREFIX, "").strip("/")
-            resources_key = f"{prefix['Prefix']}resources.json"
 
-            try:
-                obj = s3_client.get_object(Bucket=S3_BUCKET, Key=resources_key)
-                resources = json.loads(obj["Body"].read().decode("utf-8"))
-                last_modified = obj["LastModified"].isoformat()
-            except s3_client.exceptions.NoSuchKey:
-                resources = []
-                last_modified = None
-            except Exception:
-                resources = []
-                last_modified = None
+            # Find the latest resources.json.gz in the date-based structure
+            resources_key, last_modified = find_latest_resources_key(prefix["Prefix"])
+
+            resources = []
+            last_updated = None
+
+            if resources_key:
+                try:
+                    obj = s3_client.get_object(Bucket=S3_BUCKET, Key=resources_key)
+                    raw_data = obj["Body"].read()
+
+                    # Decompress gzip
+                    decompressed = gzip.decompress(raw_data)
+                    resources = json.loads(decompressed.decode("utf-8"))
+                    last_updated = last_modified.isoformat() if last_modified else None
+                except Exception:
+                    resources = []
+                    last_updated = None
 
             results.append(
                 {
                     "name": policy_name,
                     "resources": resources,
                     "resource_count": len(resources),
-                    "last_updated": last_modified,
+                    "last_updated": last_updated,
                 }
             )
     except Exception as e:
@@ -103,10 +138,10 @@ def index():
 
 @app.route("/api/results")
 def api_results():
-    if LOCAL_OUTPUT:
+    # Try S3 first, fall back to local
+    results = load_results_from_s3()
+    if not results and LOCAL_OUTPUT:
         results = load_results_from_local()
-    else:
-        results = load_results_from_s3()
 
     summary = {
         "total_policies": len(results),
