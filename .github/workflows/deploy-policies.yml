@@ -1,10 +1,6 @@
 name: Deploy Cloud Custodian Policies
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'backend/policies/**'
   workflow_dispatch:
 
 env:

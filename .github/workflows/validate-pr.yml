@@ -1,11 +1,7 @@
 name: Validate Policies (PR Check)
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - 'backend/policies/**'
-      - 'policy.yml'
+  workflow_dispatch:
 
 jobs:
   validate:

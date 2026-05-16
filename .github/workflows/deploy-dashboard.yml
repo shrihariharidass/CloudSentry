@@ -1,10 +1,6 @@
 name: Deploy Dashboard to EC2
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'frontend/**'
   workflow_dispatch:
 
 env:
