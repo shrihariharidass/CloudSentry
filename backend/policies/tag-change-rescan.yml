@@ -1,0 +1,17 @@
+policies:
+  - name: ec2-compliance-rescan-on-tag
+    resource: aws.ec2
+    description: "Re-scan EC2 compliance when tags are added/changed"
+    mode:
+      type: cloudtrail
+      role: "arn:aws:iam::{account_id}:role/CloudCustodianLambdaRole"
+      events:
+        - source: ec2.amazonaws.com
+          event: CreateTags
+          ids: "requestParameters.resourcesSet.items[].resourceId"
+      timeout: 300
+    filters:
+      - State.Name: running
+      - or:
+        - "tag:Environment": absent
+        - "tag:Owner": absent

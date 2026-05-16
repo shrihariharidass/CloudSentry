@@ -5,7 +5,7 @@ policies:
     mode:
       type: periodic
       role: arn:aws:iam::{account_id}:role/CloudCustodianLambdaRole
-      schedule: "rate(1 hour)"
+      schedule: "rate(5 minutes)"
       timeout: 300
     filters:
       - State.Name: running
