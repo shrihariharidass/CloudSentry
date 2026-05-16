@@ -11,7 +11,7 @@ terraform {
   backend "s3" {
     bucket = "tfstatetry"
     key    = "cloudcustodian-ui/terraform.tfstate"
-    region = "us-east-1"
+    region = "us-west-2"
   }
 }
 
