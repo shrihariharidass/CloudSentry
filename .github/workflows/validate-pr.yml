@@ -24,7 +24,7 @@ jobs:
 
       - name: Replace account ID placeholders
         run: |
-          sed -i 's/{account_id}/858688858026/g' backend/policies/*.yml
+          sed -i "s/{account_id}/${{ secrets.AWS_ACCOUNT_ID }}/g" backend/policies/*.yml
 
       - name: Validate all policies
         run: |

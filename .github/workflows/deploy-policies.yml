@@ -9,8 +9,6 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  S3_BUCKET: custodian-results-858688858026
-  ACCOUNT_ID: 858688858026
 
 jobs:
   deploy-policies:
@@ -25,8 +23,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install Cloud Custodian
-        run: |
-          pip install c7n
+        run: pip install c7n
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -37,7 +34,7 @@ jobs:
 
       - name: Replace account ID in policies
         run: |
-          sed -i "s/{account_id}/${{ env.ACCOUNT_ID }}/g" backend/policies/*.yml
+          sed -i "s/{account_id}/${{ secrets.AWS_ACCOUNT_ID }}/g" backend/policies/*.yml
 
       - name: Validate policies
         run: |
@@ -46,10 +43,10 @@ jobs:
 
       - name: Deploy real-time policies (Lambda + EventBridge)
         run: |
-          custodian run -s s3://${{ env.S3_BUCKET }}/policies \
+          custodian run -s s3://custodian-results-${{ secrets.AWS_ACCOUNT_ID }}/policies \
             backend/policies/realtime-tag-enforcement.yml
 
       - name: Deploy scheduled policies (Lambda + CloudWatch)
         run: |
-          custodian run -s s3://${{ env.S3_BUCKET }}/policies \
+          custodian run -s s3://custodian-results-${{ secrets.AWS_ACCOUNT_ID }}/policies \
             backend/policies/scheduled-scan.yml

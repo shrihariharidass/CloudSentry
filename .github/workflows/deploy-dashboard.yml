@@ -9,7 +9,6 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  S3_BUCKET: custodian-results-858688858026
 
 jobs:
   deploy-dashboard:
@@ -46,11 +45,9 @@ jobs:
             cd /home/ubuntu/cloudcustodian-UI
             git pull origin main
 
-            # Install/update dependencies
             source custodian/bin/activate
             pip install -r frontend/requirements.txt
 
-            # Restart dashboard service
             sudo systemctl restart custodian-dashboard
 
-            echo "Dashboard deployed successfully at http://${{ steps.ec2.outputs.ip }}:5000"
+            echo "Dashboard deployed successfully"
