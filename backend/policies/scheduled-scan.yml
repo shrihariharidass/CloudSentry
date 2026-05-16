@@ -1,0 +1,37 @@
+policies:
+  - name: ec2-missing-tags-scheduled
+    resource: aws.ec2
+    description: "Scheduled scan for EC2 instances missing required tags"
+    mode:
+      type: periodic
+      role: arn:aws:iam::{account_id}:role/CloudCustodianLambdaRole
+      schedule: "rate(1 hour)"
+      timeout: 300
+    filters:
+      - State.Name: running
+      - or:
+        - "tag:Environment": absent
+        - "tag:Owner": absent
+
+  - name: s3-encryption-check-scheduled
+    resource: aws.s3
+    description: "Scheduled scan for S3 buckets without encryption"
+    mode:
+      type: periodic
+      role: arn:aws:iam::{account_id}:role/CloudCustodianLambdaRole
+      schedule: "rate(6 hours)"
+      timeout: 300
+    filters:
+      - type: bucket-encryption
+        state: false
+
+  - name: ebs-unused-volumes-scheduled
+    resource: aws.ebs
+    description: "Scheduled scan for unattached EBS volumes"
+    mode:
+      type: periodic
+      role: arn:aws:iam::{account_id}:role/CloudCustodianLambdaRole
+      schedule: "rate(12 hours)"
+      timeout: 300
+    filters:
+      - Attachments: []

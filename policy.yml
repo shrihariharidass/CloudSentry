@@ -1,20 +1,36 @@
 policies:
   - name: find-unencrypted-s3
-    description: Find S3 buckets without default encryption
+    description: "Find S3 buckets without default encryption enabled"
     resource: aws.s3
     filters:
       - type: bucket-encryption
         state: false
 
   - name: ec2-missing-tags
-    description: Find EC2 instances missing required tags
+    description: "Find running EC2 instances missing Environment and Owner tags"
     resource: aws.ec2
     filters:
-      - "tag:Environment": absent
-      - "tag:Owner": absent
+      - State.Name: running
+      - or:
+        - "tag:Environment": absent
+        - "tag:Owner": absent
 
   - name: find-public-s3
-    description: Find S3 buckets with public access
+    description: "Detect S3 buckets with public access grants"
     resource: aws.s3
     filters:
       - type: global-grants
+
+  - name: unused-ebs-volumes
+    description: "Find EBS volumes not attached to any instance"
+    resource: aws.ebs
+    filters:
+      - Attachments: []
+
+  - name: ec2-unencrypted-volumes
+    description: "Find EC2 instances with unencrypted EBS volumes"
+    resource: aws.ec2
+    filters:
+      - type: ebs
+        key: Encrypted
+        value: false
