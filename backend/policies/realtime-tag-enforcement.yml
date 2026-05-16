@@ -1,0 +1,36 @@
+policies:
+  - name: ec2-tag-enforcement-realtime
+    resource: aws.ec2
+    description: "Detect EC2 instances created without required tags via CloudTrail"
+    mode:
+      type: cloudtrail
+      role: "arn:aws:iam::{account_id}:role/CloudCustodianLambdaRole"
+      events:
+        - RunInstances
+      timeout: 300
+    filters:
+      - or:
+        - "tag:Environment": absent
+        - "tag:Owner": absent
+    actions:
+      - type: tag
+        key: custodian-compliance
+        value: "non-compliant-missing-tags"
+
+  - name: s3-tag-enforcement-realtime
+    resource: aws.s3
+    description: "Detect S3 buckets created without required tags"
+    mode:
+      type: cloudtrail
+      role: "arn:aws:iam::{account_id}:role/CloudCustodianLambdaRole"
+      events:
+        - CreateBucket
+      timeout: 300
+    filters:
+      - or:
+        - "tag:Environment": absent
+        - "tag:Owner": absent
+    actions:
+      - type: tag
+        key: custodian-compliance
+        value: "non-compliant-missing-tags"
