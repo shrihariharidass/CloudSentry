@@ -214,12 +214,17 @@
 
     <div class="container">
         <div class="tabs">
-            <div class="tab active" onclick="switchTab('policies')">Policy Results</div>
+            <div class="tab active" onclick="switchTab('policies')">Compliance Status</div>
+            <div class="tab" onclick="switchTab('realtime')">Real-time Events</div>
             <div class="tab" onclick="switchTab('cloudtrail')">CloudTrail Events</div>
         </div>
 
         <div id="policies-tab" class="tab-content active">
             <div class="loading">Loading results...</div>
+        </div>
+
+        <div id="realtime-tab" class="tab-content">
+            <div class="loading">Loading real-time events...</div>
         </div>
 
         <div id="cloudtrail-tab" class="tab-content">
@@ -238,6 +243,17 @@
             } catch (error) {
                 document.getElementById('policies-tab').innerHTML =
                     '<div class="loading">Error loading results.</div>';
+            }
+        }
+
+        async function loadRealtimeEvents() {
+            try {
+                const response = await fetch('/api/realtime-events');
+                const data = await response.json();
+                renderRealtimeEvents(data);
+            } catch (error) {
+                document.getElementById('realtime-tab').innerHTML =
+                    '<div class="loading">Error loading real-time events.</div>';
             }
         }
 
@@ -276,9 +292,12 @@
                     </div>
                 </div>
                 <div class="section-title">
-                    <span>Policy Results</span>
+                    <span>Current Compliance Status</span>
                     <span class="last-updated">Last refreshed: ${new Date().toLocaleTimeString()}</span>
                 </div>
+                <p style="color: #8899a6; font-size: 13px; margin-bottom: 16px;">
+                    Shows current state from scheduled scans. Resources that have been remediated will show as compliant.
+                </p>
             `;
 
             policies.forEach((policy, index) => {
@@ -293,6 +312,42 @@
                             <span class="policy-badge ${badgeClass}">${badgeText}</span>
                         </div>
                         <div class="policy-details" id="details-${index}">
+                            ${renderResources(policy)}
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function renderRealtimeEvents(data) {
+            const container = document.getElementById('realtime-tab');
+
+            if (!data.policies || data.policies.length === 0) {
+                container.innerHTML = '<div class="loading">No real-time enforcement events recorded yet.</div>';
+                return;
+            }
+
+            let html = `
+                <div class="section-title"><span>Real-time Enforcement Events (Audit Log)</span></div>
+                <p style="color: #8899a6; font-size: 13px; margin-bottom: 16px;">
+                    Historical record of resources that were non-compliant at creation time. These are point-in-time captures — resources may have been remediated since.
+                </p>
+            `;
+
+            data.policies.forEach((policy, index) => {
+                const badgeText = policy.resource_count > 0
+                    ? `${policy.resource_count} event(s) captured`
+                    : 'No events';
+
+                html += `
+                    <div class="policy-card">
+                        <div class="policy-header" onclick="toggleDetails('rt-${index}')">
+                            <span class="policy-name">${policy.name}</span>
+                            <span class="policy-badge badge-violation" style="background: rgba(243, 156, 18, 0.15); color: #f39c12;">${badgeText}</span>
+                        </div>
+                        <div class="policy-details" id="details-rt-${index}">
                             ${renderResources(policy)}
                         </div>
                     </div>
@@ -409,6 +464,7 @@
             document.getElementById(`${tab}-tab`).classList.add('active');
 
             if (tab === 'cloudtrail') loadCloudTrail();
+            if (tab === 'realtime') loadRealtimeEvents();
         }
 
         // Initial load

@@ -1,6 +1,7 @@
 """
 Cloud Custodian Dashboard - Flask app that reads policy results from S3.
 Handles c7n's date-based S3 output structure with gzipped files.
+Separates scheduled scans (current state) from real-time events (audit log).
 """
 
 import gzip
@@ -16,30 +17,26 @@ app = Flask(__name__)
 S3_BUCKET = os.environ.get("C7N_S3_BUCKET", "custodian-results-858688858026")
 S3_PREFIX = os.environ.get("C7N_S3_PREFIX", "policies/")
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
-LOCAL_OUTPUT = os.environ.get("C7N_LOCAL_OUTPUT", "")  # Fallback to local output dir
+LOCAL_OUTPUT = os.environ.get("C7N_LOCAL_OUTPUT", "")
 
 s3_client = boto3.client("s3", region_name=AWS_REGION)
 
+# Real-time policies are event-based (audit log), not current state
+REALTIME_POLICIES = {"ec2-tag-enforcement-realtime", "s3-tag-enforcement-realtime"}
+
 
 def find_latest_resources_key(policy_prefix):
-    """Find the most recent resources.json.gz for a policy in date-based S3 structure.
-    Structure: policies/<policy-name>/YYYY/MM/DD/HH/resources.json.gz
-    """
+    """Find the most recent resources.json.gz in date-based S3 structure."""
     try:
         response = s3_client.list_objects_v2(
             Bucket=S3_BUCKET, Prefix=policy_prefix
         )
         objects = response.get("Contents", [])
-
-        # Find all resources.json.gz files and get the latest one
         resource_files = [
             obj for obj in objects if obj["Key"].endswith("resources.json.gz")
         ]
-
         if not resource_files:
             return None, None
-
-        # Sort by LastModified to get the most recent
         resource_files.sort(key=lambda x: x["LastModified"], reverse=True)
         latest = resource_files[0]
         return latest["Key"], latest["LastModified"]
@@ -47,52 +44,59 @@ def find_latest_resources_key(policy_prefix):
         return None, None
 
 
+def load_policy_data(prefix):
+    """Load a single policy's latest results from S3."""
+    policy_name = prefix["Prefix"].replace(S3_PREFIX, "").strip("/")
+    resources_key, last_modified = find_latest_resources_key(prefix["Prefix"])
+
+    resources = []
+    last_updated = None
+
+    if resources_key:
+        try:
+            obj = s3_client.get_object(Bucket=S3_BUCKET, Key=resources_key)
+            raw_data = obj["Body"].read()
+            decompressed = gzip.decompress(raw_data)
+            resources = json.loads(decompressed.decode("utf-8"))
+            last_updated = last_modified.isoformat() if last_modified else None
+        except Exception:
+            resources = []
+            last_updated = None
+
+    return {
+        "name": policy_name,
+        "resources": resources,
+        "resource_count": len(resources),
+        "last_updated": last_updated,
+    }
+
+
 def load_results_from_s3():
-    """Load policy results from S3 bucket with date-based paths and gzip."""
-    results = []
+    """Load policy results from S3, separating scheduled (current state) from real-time (events)."""
+    scheduled_results = []
+    realtime_events = []
+
     try:
         response = s3_client.list_objects_v2(
             Bucket=S3_BUCKET, Prefix=S3_PREFIX, Delimiter="/"
         )
-
         prefixes = response.get("CommonPrefixes", [])
+
         for prefix in prefixes:
             policy_name = prefix["Prefix"].replace(S3_PREFIX, "").strip("/")
+            data = load_policy_data(prefix)
 
-            # Find the latest resources.json.gz in the date-based structure
-            resources_key, last_modified = find_latest_resources_key(prefix["Prefix"])
+            if policy_name in REALTIME_POLICIES:
+                realtime_events.append(data)
+            else:
+                scheduled_results.append(data)
 
-            resources = []
-            last_updated = None
-
-            if resources_key:
-                try:
-                    obj = s3_client.get_object(Bucket=S3_BUCKET, Key=resources_key)
-                    raw_data = obj["Body"].read()
-
-                    # Decompress gzip
-                    decompressed = gzip.decompress(raw_data)
-                    resources = json.loads(decompressed.decode("utf-8"))
-                    last_updated = last_modified.isoformat() if last_modified else None
-                except Exception:
-                    resources = []
-                    last_updated = None
-
-            results.append(
-                {
-                    "name": policy_name,
-                    "resources": resources,
-                    "resource_count": len(resources),
-                    "last_updated": last_updated,
-                }
-            )
     except Exception as e:
-        # Fallback to local output if S3 fails
         if LOCAL_OUTPUT:
-            return load_results_from_local()
-        return [{"error": str(e)}]
+            return load_results_from_local(), []
+        return [{"error": str(e)}], []
 
-    return results
+    return scheduled_results, realtime_events
 
 
 def load_results_from_local():
@@ -138,22 +142,32 @@ def index():
 
 @app.route("/api/results")
 def api_results():
-    # Try S3 first, fall back to local
-    results = load_results_from_s3()
-    if not results and LOCAL_OUTPUT:
-        results = load_results_from_local()
+    """Returns current compliance state from scheduled scans."""
+    scheduled_results, realtime_events = load_results_from_s3()
+
+    if not scheduled_results and LOCAL_OUTPUT:
+        scheduled_results = load_results_from_local()
 
     summary = {
-        "total_policies": len(results),
-        "total_violations": sum(r.get("resource_count", 0) for r in results),
+        "total_policies": len(scheduled_results),
+        "total_violations": sum(r.get("resource_count", 0) for r in scheduled_results),
         "compliant_policies": sum(
-            1 for r in results if r.get("resource_count", 0) == 0
+            1 for r in scheduled_results if r.get("resource_count", 0) == 0
         ),
         "non_compliant_policies": sum(
-            1 for r in results if r.get("resource_count", 0) > 0
+            1 for r in scheduled_results if r.get("resource_count", 0) > 0
         ),
     }
-    return jsonify({"summary": summary, "policies": results})
+    return jsonify({"summary": summary, "policies": scheduled_results})
+
+
+@app.route("/api/realtime-events")
+def realtime_events():
+    """Returns real-time enforcement events (audit log)."""
+    _, realtime_results = load_results_from_s3()
+
+    total_events = sum(r.get("resource_count", 0) for r in realtime_results)
+    return jsonify({"total_events": total_events, "policies": realtime_results})
 
 
 @app.route("/api/cloudtrail-events")
