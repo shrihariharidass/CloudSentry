@@ -8,11 +8,12 @@ terraform {
     }
   }
 
-  backend "s3" {
-    bucket = "tfstatetry"
-    key    = "cloudcustodian-ui/terraform.tfstate"
-    region = "us-west-2"
-  }
+  # Uncomment and configure for remote state
+  # backend "s3" {
+  #   bucket = "your-terraform-state-bucket"
+  #   key    = "cloudsentry/terraform.tfstate"
+  #   region = "us-east-1"
+  # }
 }
 
 provider "aws" {

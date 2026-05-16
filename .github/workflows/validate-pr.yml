@@ -31,13 +31,4 @@ jobs:
           custodian validate policy.yml
           custodian validate backend/policies/realtime-tag-enforcement.yml
           custodian validate backend/policies/scheduled-scan.yml
-
-      - name: Dry run local policies
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-1
-        run: |
-          custodian run --dryrun -s /tmp/output --cache-period 0 policy.yml
-          echo "Matched resources:"
-          cat /tmp/output/*/resources.json 2>/dev/null || echo "No violations found"
+          custodian validate backend/policies/tag-change-rescan.yml

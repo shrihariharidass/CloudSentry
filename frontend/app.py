@@ -14,7 +14,7 @@ from flask import Flask, jsonify, render_template
 
 app = Flask(__name__)
 
-S3_BUCKET = os.environ.get("C7N_S3_BUCKET", "custodian-results-858688858026")
+S3_BUCKET = os.environ.get("C7N_S3_BUCKET", "")
 S3_PREFIX = os.environ.get("C7N_S3_PREFIX", "policies/")
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 LOCAL_OUTPUT = os.environ.get("C7N_LOCAL_OUTPUT", "")

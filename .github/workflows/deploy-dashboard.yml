@@ -28,7 +28,7 @@ jobs:
         id: ec2
         run: |
           EC2_IP=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=cloudcustodian-ui-dashboard" \
+            --filters "Name=tag:Name,Values=cloudsentry-dashboard" \
                       "Name=instance-state-name,Values=running" \
             --query "Reservations[0].Instances[0].PublicIpAddress" \
             --output text)
@@ -42,10 +42,10 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            cd /home/ubuntu/cloudcustodian-UI
+            cd /home/ubuntu/CloudSentry
 
             # Set git credentials for pull
-            git remote set-url origin https://${{ secrets.GH_USERNAME }}:${{ secrets.GH_TOKEN }}@github.com/${{ secrets.GH_USERNAME }}/cloudcustodian-UI.git
+            git remote set-url origin https://${{ secrets.GH_USERNAME }}:${{ secrets.GH_TOKEN }}@github.com/${{ secrets.GH_USERNAME }}/CloudSentry.git
 
             git pull origin main
 
@@ -54,6 +54,6 @@ jobs:
             pip install -r frontend/requirements.txt
 
             # Restart dashboard service
-            sudo systemctl restart custodian-dashboard
+            sudo systemctl restart cloudsentry
 
             echo "Dashboard deployed successfully"

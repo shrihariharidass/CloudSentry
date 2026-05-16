@@ -1,5 +1,7 @@
 # Virtual environment
 custodian/
+venv/
+.venv/
 
 # Cloud Custodian output (regenerated on each run)
 output/
@@ -8,7 +10,11 @@ output/
 __pycache__/
 *.pyc
 *.pyo
+*.egg-info/
+
+# Environment files (contain secrets)
 .env
+*.env.local
 
 # Terraform
 infra/.terraform/
@@ -16,10 +22,14 @@ infra/.terraform.lock.hcl
 *.tfstate
 *.tfstate.backup
 .terraform/
+terraform.tfvars
 
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
 
 # OS
 .DS_Store
+Thumbs.db

@@ -42,7 +42,7 @@ jobs:
           custodian validate backend/policies/scheduled-scan.yml
           custodian validate backend/policies/tag-change-rescan.yml
 
-      - name: Deploy real-time policies (Lambda + EventBridge)
+      - name: Deploy real-time policies
         run: |
           custodian run -s s3://custodian-results-${{ secrets.AWS_ACCOUNT_ID }}/policies \
             backend/policies/realtime-tag-enforcement.yml
@@ -52,7 +52,7 @@ jobs:
           custodian run -s s3://custodian-results-${{ secrets.AWS_ACCOUNT_ID }}/policies \
             backend/policies/tag-change-rescan.yml
 
-      - name: Deploy scheduled policies (Lambda + CloudWatch)
+      - name: Deploy scheduled policies
         run: |
           custodian run -s s3://custodian-results-${{ secrets.AWS_ACCOUNT_ID }}/policies \
             backend/policies/scheduled-scan.yml
