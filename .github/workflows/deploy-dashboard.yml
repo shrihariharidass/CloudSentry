@@ -1,0 +1,48 @@
+name: Deploy Dashboard to EC2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+  workflow_dispatch:
+
+env:
+  EC2_HOST: ${{ secrets.EC2_HOST }}
+  EC2_USER: ubuntu
+  S3_BUCKET: custodian-results-858688858026
+  AWS_REGION: us-east-1
+
+jobs:
+  deploy-dashboard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ env.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ubuntu/cloudcustodian-UI
+            git pull origin main
+
+            # Install/update dependencies
+            source ~/custodian/bin/activate
+            pip install -r frontend/requirements.txt
+
+            # Stop existing dashboard process
+            fuser -k 5000/tcp || true
+
+            # Start dashboard with S3 backend
+            cd frontend
+            export C7N_S3_BUCKET="${{ env.S3_BUCKET }}"
+            export C7N_S3_PREFIX="policies/"
+            export AWS_REGION="${{ env.AWS_REGION }}"
+            export C7N_LOCAL_OUTPUT="../output"
+            nohup gunicorn --bind 0.0.0.0:5000 --workers 2 app:app > /tmp/dashboard.log 2>&1 &
+
+            echo "Dashboard deployed successfully"
